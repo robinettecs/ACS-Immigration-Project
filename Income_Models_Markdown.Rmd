@@ -1,0 +1,231 @@
+---
+title: 'Immigration Analytics: Income Models'
+author: "Chris Robinette"
+date: "7/28/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Introduction 
+
+Following the ANOVA models,target variables were selected based on robust statistical differences between the population groups across key measures. Models are broken out according to income and occupation categories as the target variables, with various demographic measures as the independent variables. (This document contains the income models, with the occupation models in a separate markdown file). To approach the modelling stage efficiently, key benchmark tests were performed on each model to assess the appropriate corrective action needed to increase the robustness of the models.    
+
+```{r, include = FALSE}
+library(haven)
+library(dplyr)
+library(tseries)
+library(ggplot2)
+library(fpp2)
+library(urca)
+library(lmtest)
+library(sandwich)
+library(car)
+ACS_MELTED_FINAL <- read.csv("~/Desktop/Summer 2020 School Notes/AAP/Applied Analytics Project copy/MAIN DATA/ACS/ACS_Transpose/Melted_Splitpop.csv")
+attach(ACS_MELTED_FINAL)
+```
+
+## Income Models
+
+The target variables for income are broken out according to bracket. Explanatory variables in each model include dummy variables for foreign-born non-citizens and naturalized citizens, with native citizens as the omitted base category. Occupation categories for Construction, Service, and Sales were included, with the omitted categories being Business, Science, and Production. Variables for races Black and Asian and for Latin American ethnicity were also included, with white non-latin folks serving as the base category. The values for each variable are expressed as percentages of the total population pool, so the log was taken for each target and explanatory variable with the exception of the population categories. 
+
+## Model Testing and Correction 
+
+Each model was assessed for normality, heteroskedasticity, and multicollinearity.  Shapiro and Jarque-Bera tests were used to assess normality, while Brausch-Pagan tests were used to asses heteroskedasticity. Finally, variance inflation factor tests were used to assess multicollinearity. For each model, residuals were generally normally distributed, heteroskedastic, and the independent variables were not significantly multicollinear. To deal with heteroskedasticity, White standard errors were used in generalized linear models. The log of the squared residuals was regressed on the explanatory variables, with the weight calculated as 1 over the square root of the exponential of the resulting fitted values. 
+
+
+
+
+## Model: $10k-15k
+
+###Testing:
+```{r}
+reg_earn10_15 <- lm(log(earn12_10_15) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+summary(reg_earn10_15)
+hist(reg_earn10_15$residuals, breaks = 20)
+shapiro.test(reg_earn10_15$residuals)
+jarque.bera.test(reg_earn10_15$residuals)
+bptest(reg_earn10_15)
+vif(reg_earn10_15)
+```
+
+
+###Correction
+```{r}
+coeftest(reg_earn10_15, vcov = vcovHC(reg_earn10_15, "HC1"))
+
+resi <- reg_earn10_15$residuals
+varfunc.ols <- lm(log(resi^2) ~ fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+varfunc <- exp(varfunc.ols$fitted.values)
+earn10_15.gls <- lm(earn12_10_15 ~ fb_nocit + fb_ntrl + occ_con + occ_srv + occ_sales + black + asian + lat_or, weights = 1/sqrt(varfunc))
+
+summary(earn10_15.gls)
+
+```
+
+###Results
+
+After transforming the model, there is a significant reduction in the values of the standard errors. Movement from native to non-citizens showS an estimated increase of 0.456 units in presence in the income category $10k-$15k and is statistically significant at the p < 0.01 level. Movement from the native to naturalized category is not statistically significant. Movement from race-white to Asian shows a reduction in presence for this income bracket and is significant at the p < 0.05 level. Movement from race-white to Black shows an increase of about 2% and is statistically significant at the p < 0.0001 level. Movement from the base occupation categories to construction, service, and sales were positively associated with increased presence in the $10-$15k a year bracket, and all three are statistically signficant. With an adjusted R-squared of 0.602, this model explains a significant amount of variance for this income group.
+
+##Model: $15k-25k
+
+###Testing
+```{r}
+reg_earn15_25 <- lm(log(earn12_15_25) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+summary(reg_earn15_25)
+hist(reg_earn15_25$residuals, breaks = 20)
+shapiro.test(reg_earn15_25$residuals)
+jarque.bera.test(reg_earn15_25$residuals)
+bptest(reg_earn15_25)
+vif(reg_earn15_25)
+```
+
+###Correction
+```{r}
+coeftest(reg_earn15_25, vcov = vcovHC(reg_earn15_25, "HC1"))
+
+resi <- reg_earn15_25$residuals
+varfunc.ols <- lm(log(resi^2) ~ fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+varfunc <- exp(varfunc.ols$fitted.values)
+earn15_25.gls <- lm(earn12_15_25 ~ fb_nocit + fb_ntrl + occ_con + occ_srv + occ_sales + black + asian + lat_or, weights = 1/sqrt(varfunc))
+
+summary(earn15_25.gls)
+
+```
+
+###Results
+In the case of the $15k-$25k a year income bracket, movement from the base categories caused a significant effect on for each variable, with the exception of race-Black. PResence in this income category is strongly negatively associated with the foreign-born naturalized population, and positively associated with the non-citizen population. The occupation of sales is negatively associated with presence in this income bracket and is significant at the p < 0.05 level.
+
+
+##Model: $25k-35k
+
+###Testing
+```{r}
+reg_earn25_35 <- lm(log(earn12_25_35) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+summary(reg_earn25_35)
+hist(reg_earn25_35$residuals, breaks = 20)
+shapiro.test(reg_earn25_35$residuals)
+jarque.bera.test(reg_earn25_35$residuals)
+bptest(reg_earn25_35)
+vif(reg_earn25_35)
+```
+
+
+###Correction
+```{r}
+coeftest(reg_earn25_35, vcov = vcovHC(reg_earn25_35, "HC1"))
+
+resi <- reg_earn25_35$residuals
+varfunc.ols <- lm(log(resi^2) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+varfunc <- exp(varfunc.ols$fitted.values)
+earn25_35.gls <- lm(earn12_25_35 ~  fb_nocit + fb_ntrl + occ_con + occ_srv + occ_sales + black + asian + lat_or, weights = 1/sqrt(varfunc))
+
+summary(earn25_35.gls)
+```
+
+###Results
+Movement from native to non-citizen is not statistically signficant for this model, but still has a substantial negative impact on presence in the $25k-$35k income bracket. Movement from native to naturalized citizen is statistically significant at the p < 0.0001 level and has a positive impact on the target variable. All race/ethinicity variables have a negative impact on the target variable here, with only the race-Black category being statistically significant at at least the p <0.05 level. Service and construction occupations have a positive impact on presence in the income category here, while sales has a negative impact but is not statistically significant. 
+
+##Model Earnings $35k-50k
+
+###Testing
+```{r}
+reg_earn35_50 <- lm(log(earn12_35_50) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+summary(reg_earn35_50)
+hist(reg_earn35_50$residuals, breaks = 20)
+shapiro.test(reg_earn35_50$residuals)
+jarque.bera.test(reg_earn35_50$residuals)
+bptest(reg_earn35_50)
+vif(reg_earn35_50)
+```
+
+###Correction
+```{r}
+coeftest(reg_earn35_50, vcov = vcovHC(reg_earn35_50, "HC1"))
+
+resi <- reg_earn35_50$residuals
+varfunc.ols <- lm(log(resi^2) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+varfunc <- exp(varfunc.ols$fitted.values)
+earn35_50.gls <- lm(earn12_35_50 ~  fb_nocit + fb_ntrl + occ_con + occ_srv + occ_sales + black + asian + lat_or, weights = 1/sqrt(varfunc))
+
+summary(earn35_50.gls)
+```
+
+
+###Results
+
+All variables are statistically significant in this model at the p < 0.0001 level. Foreign-born non-citizens, Black and Asian populations, and those with latin ethnicity all have a negative relationship with with presence in this category, albeit the effect is relatively small for all except the non-citizen populations. The Naturalized population has a strong positive effect on presence in this income category, and each occupation group has a positive impact, with Sales being the most substantially significant. 
+
+
+##Model $50k-75K
+
+###Testing
+
+```{r}
+reg_earn50_75 <- lm(log(earn12_50_75) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+summary(reg_earn50_75)
+hist(reg_earn50_75$residuals, breaks = 20)
+shapiro.test(reg_earn50_75$residuals)
+jarque.bera.test(reg_earn50_75$residuals)
+bptest(reg_earn50_75)
+vif(reg_earn50_75)
+```
+
+
+###Correction
+```{r}
+coeftest(reg_earn50_75, vcov = vcovHC(reg_earn50_75, "HC1"))
+
+resi <- reg_earn50_75$residuals
+varfunc.ols <- lm(log(resi^2) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+varfunc <- exp(varfunc.ols$fitted.values)
+earn50_75.gls <- lm(earn12_50_75 ~  fb_nocit + fb_ntrl + occ_con + occ_srv + occ_sales + black + asian + lat_or, weights = 1/sqrt(varfunc))
+
+summary(earn50_75.gls)
+```
+
+###Results
+All variables are statistically significant in this model at the p < 0.0001 level, with the exception of movement from the native to naturalized population category. All variables are also negatively associated with presence in this income bracket, with the exception of the Sales occupation category. With an adjusted R-squared value of 0.744, this model explains a considerable amount of variance in the dependent variable. 
+
+
+
+##Model $75k and up
+
+###Testing
+
+```{r}
+reg_earn75up <- lm(log(earn12_75up) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+summary(reg_earn75up)
+hist(reg_earn75up$residuals, breaks = 20)
+shapiro.test(reg_earn75up$residuals)
+jarque.bera.test(reg_earn75up$residuals)
+bptest(reg_earn75up)
+vif(reg_earn75up)
+```
+
+###Correction
+
+```{r}
+coeftest(reg_earn75up, vcov = vcovHC(reg_earn75up, "HC1"))
+
+resi <- reg_earn75up$residuals
+varfunc.ols <- lm(log(resi^2) ~  fb_nocit + fb_ntrl + log(occ_con) + log(occ_srv) + log(occ_sales) + log(black) + log(asian) + log(lat_or))
+varfunc <- exp(varfunc.ols$fitted.values)
+earn75up.gls <- lm(earn12_75up ~  fb_nocit + fb_ntrl + occ_con + occ_srv + occ_sales + black + asian + lat_or, weights = 1/sqrt(varfunc))
+
+summary(earn75up.gls)
+
+```
+
+### Results
+
+Perhaps some of the more interesting results are present in this model with the income bracket of $75k up. All variables are statistically significant at the p < 0.0001 level with the exception of foreign-born non-citizens, who did not have a signficant effect on the target variable. Latin ethnicity is significant at the p < 0.001 level. All three occupation categories have a negative effect on presence in the 75k and up income bracket. Each race/ethinicity category was positively associated with presence in this income bracket, with race-black having the strongest effect. This seems to contradict common conceptions of the demographic makeup of high-earning categories.
+
+
+
+##Discussion
+
+The strongest models here are for the 10k-15k (Adj. R2 = 0.60 ), 15k-25k (Adj. R2 = 0.74), and the 50k-75k (Adj. R2 = 0.74) income brackets as target variables. The next steps would be to alter the variables included in the models with lower explanatory value to assess what other factors may be of more releavnce. While the advantage of testing the same independent variables against each income bracket allows for an assessment of the impact of the variables across the income distribution, there are clearly other factors influencing variance in the models with low adjusted r-squared values. 
+
+
+

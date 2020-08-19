@@ -1,0 +1,160 @@
+---
+title: 'Immgration Analytics: Occupation Models'
+author: "Chris Robinette"
+date: "7/29/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+library(haven)
+library(dplyr)
+library(tseries)
+library(ggplot2)
+library(fpp2)
+library(urca)
+library(lmtest)
+library(sandwich)
+library(car)
+ACS_MELTED_FINAL <- read.csv("~/Desktop/Summer 2020 School Notes/AAP/Applied Analytics Project copy/MAIN DATA/ACS/ACS_Transpose/Melted_Splitpop.csv")
+attach(ACS_MELTED_FINAL)
+```
+
+## Introduction
+
+Following the ANOVA models,target variables were selected based on robust statistical differences between the population groups across key measures. Models are broken out according to income and occupation categories as the target variables, with various demographic measures as the independent variables. (This document contains the occupation models, with the income models in a separate markdown file). To approach the modelling stage efficiently, key benchmark tests were performed on each model to assess the appropriate corrective action needed to increase the robustness of the models. 
+
+##Occupation: Management/Business/Science/Arts
+```{r}
+reg_occ_mbsa <- lm(occ_mbsa ~ fb_nocit + fb_ntrl + asian + black + lat_or + wrkcls_govt + wrkcls_selfemp + wrkcls_ufw + earn12_25_35 + earn12_35_50 + earn12_50_75 + earn12_75up)
+summary(reg_occ_mbsa)
+```
+
+###Testing
+```{r}
+hist(reg_occ_mbsa$residuals, breaks = 20)
+shapiro.test(reg_occ_mbsa$residuals)
+jarque.bera.test(reg_occ_mbsa$residuals)
+bptest(reg_occ_mbsa)
+vif(reg_occ_mbsa)
+```
+
+###Correcting:
+
+```{r}
+coeftest(reg_occ_mbsa, vcov = vcovHC(reg_occ_mbsa, "HC1"))
+
+resi <- reg_occ_mbsa$residuals
+varfunc.ols <- lm(resi^2 ~ fb_nocit + (fb_ntrl) + (asian) + (black) + (lat_or) + (wrkcls_govt) + (wrkcls_selfemp) + (wrkcls_ufw) + (earn12_25_35) + (earn12_35_50) + (earn12_50_75) + (earn12_75up))
+varfunc <- exp(varfunc.ols$fitted.values)
+reg_occ_mbsa.gls <- lm(occ_mbsa ~ fb_nocit + fb_ntrl + asian + black + lat_or + earn12_25_35 + earn12_35_50 + earn12_50_75 + earn12_75up + wrkcls_govt + wrkcls_selfemp + wrkcls_ufw, weights = 1/sqrt(varfunc))
+summary(reg_occ_mbsa.gls)
+```
+
+###Results
+The intercept for the transformed model is quite high, indicating that roughly 74% of the base category of white, non-latino native citizens will hold jobs in the management, business, science, and arts occupation category. Movement to non-citizen reduces presence in this category by roughly 1.7%, while movement to the naturalized population shows a 3.3% higher presence. All varibles are statistically significant at the p < 0.0001 level, and with an adjusted R-squared value of 0.62, this model explains a significant amount of
+variation in the MBSA occupation category. 
+
+
+##Model: Service
+
+###Testing
+```{r}
+reg_occ_srv <- lm(occ_srv ~ fb_nocit + fb_ntrl + asian + black + lat_or + wrkcls_govt + wrkcls_selfemp + wrkcls_ufw + earn12_25_35 + earn12_35_50 + earn12_50_75 + earn12_75up)
+summary(reg_occ_srv)
+hist(reg_occ_srv$residuals, breaks = 20)
+shapiro.test(reg_occ_srv$residuals)
+jarque.bera.test(reg_occ_srv$residuals)
+bptest(reg_occ_srv)
+vif(reg_occ_srv)
+```
+
+###Correcting
+
+```{r}
+coeftest(reg_occ_srv, vcov = vcovHC(reg_occ_srv, "HC1"))
+
+resi <- reg_occ_srv$residuals
+varfunc.ols <- lm(resi^2~ fb_nocit + fb_ntrl + (asian) + (black) + (lat_or) + (wrkcls_govt) + (wrkcls_selfemp) + (wrkcls_ufw) + (earn12_25_35) + (earn12_35_50) + (earn12_50_75) + (earn12_75up))
+varfunc <- exp(varfunc.ols$fitted.values)
+reg_occ_srv.gls <- lm(occ_srv ~ fb_nocit + fb_ntrl + black + asian + lat_or + earn12_25_35 + earn12_35_50 + earn12_50_75 + earn12_75up + wrkcls_govt + wrkcls_selfemp + wrkcls_ufw, weights = 1/sqrt(varfunc))
+
+summary(reg_occ_srv.gls)
+```
+
+
+##Results:
+This model suggest that roughly 15.63% of the base category of white, non-latino native citizens would hold jobs in a service occupation. Movement to the non-citizen group causes an increase of approximately 3%, while movement to the naturalized group results in a roughly 3% decrease. Movement from white to black, asian, and latin origin produces a very small positive effect that is nonetheless statistically significant. 
+
+##Model: Construction
+
+###Testing
+```{r}
+reg_occ_con <- lm(log(occ_con) ~ fb_nocit + fb_ntrl + (asian) + (black) + (lat_or) + (wrkcls_govt) + (wrkcls_selfemp) + (wrkcls_ufw) + (earn12_25_35) + (earn12_35_50) + (earn12_50_75) + (earn12_75up))
+summary(reg_occ_con)
+hist(reg_occ_con$residuals, breaks = 20)
+shapiro.test(reg_occ_con$residuals)
+jarque.bera.test(reg_occ_con$residuals)
+bptest(reg_occ_con)
+vif(reg_occ_con)
+```
+
+###Correcting
+
+```{r}
+coeftest(reg_occ_con, vcov = vcovHC(reg_occ_con, "HC1"))
+
+resi <- reg_occ_con$residuals
+varfunc.ols <- lm(log(resi^2)~ fb_nocit + fb_ntrl + (asian) + (black) + (lat_or) + (wrkcls_govt) + (wrkcls_selfemp) + (wrkcls_ufw) + (earn12_25_35) + (earn12_35_50) + (earn12_50_75) + (earn12_75up))
+varfunc <- exp(varfunc.ols$fitted.values)
+reg_occ_con.gls <- lm(occ_con ~ fb_nocit + fb_ntrl + black + asian + lat_or+ earn12_25_35 + earn12_35_50 + earn12_50_75 + earn12_75up + wrkcls_govt + wrkcls_selfemp + wrkcls_ufw, weights = 1/sqrt(varfunc))
+
+summary(reg_occ_con.gls)
+```
+
+
+##Results
+
+
+
+##Model: Production
+
+###Testing
+```{r}
+reg_occ_prod <- lm((occ_prod) ~ fb_nocit + fb_ntrl + (asian) + (black) + (lat_or) + (wrkcls_govt) + (wrkcls_selfemp) + (wrkcls_ufw) + (earn12_25_35) + (earn12_35_50) + (earn12_50_75) + (earn12_75up))
+summary(reg_occ_prod)
+hist(reg_occ_prod$residuals, breaks = 20)
+shapiro.test(reg_occ_prod$residuals)
+jarque.bera.test(reg_occ_prod$residuals)
+bptest(reg_occ_prod)
+vif(reg_occ_prod)
+```
+
+
+###Correcting
+
+```{r}
+coeftest(reg_occ_prod, vcov = vcovHC(reg_occ_prod, "HC1"))
+
+resi <- reg_occ_prod$residuals
+varfunc.ols <- lm(log(resi^2)~ fb_nocit + fb_ntrl + (asian) + (black) + (lat_or) + (wrkcls_govt) + (wrkcls_selfemp) + (wrkcls_ufw) + (earn12_25_35) + (earn12_35_50) + (earn12_50_75) + (earn12_75up))
+varfunc <- exp(varfunc.ols$fitted.values)
+reg_occ_prod.gls <- lm(occ_prod ~ fb_nocit + fb_ntrl + black + asian + lat_or + earn12_25_35 + earn12_35_50 + earn12_50_75 + earn12_75up + wrkcls_govt + wrkcls_selfemp + wrkcls_ufw, weights = 1/sqrt(varfunc))
+
+summary(reg_occ_prod.gls)
+```
+
+
+
+##Results
+
+
+
+
+
+
+
+
+
+
+

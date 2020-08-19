@@ -1,0 +1,215 @@
+---
+title: 'Time Series Final Project: Forecasting Legal Immigration to the U.S.'
+author: "Chris Robinette"
+date: "4/29/2020"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+##Abstract
+This project concerns forecasting the number of individuals seeking legal permanent resident status in the United States by using appropriate time-series forecasting methods and consideration of key parameters. Yearly immigration data from the U.S. Deparment of Homeland Security was used over a time dimension of 197 years. This data has some cyclicality, and while there is trend, there is a significant dip in the middle of the dataset which is disruptive. Other key considerations for this data (n = 197) included instability, as variance increased with the level of the series over time, requiring particular attention to the transformation of the data. The data was first split into a training and test data set to assess the accuracy of benchmark forecasting methods. The appropriate benchmark  methods included Mean Forecasting, Naive Forecasting, and RWF with Drift. After performing a Box-Cox Transformation to the data and re-testing each model, the RWF with Drift was the best-fit model. Applying this model to the transformed dataset yielded minimal errors, tighter confidence intervals, normally distributed residuals, and a significant p-value for Ljung-Box Test for autocorrelation. To handle non-stationarity, I applied the ADF and KPSS statistical tests to the transformed data to confirm non-stationarity, and subsequently difference the series apropriately. The final application of the ARIMA methodology revealed a best-ARIMA model with a log-likelihood of 87.86 and an order of (16, 0, 0). 
+
+
+
+
+##Introduction
+
+Legal immigration has long been a staple of a growing economy and diversifying culture. However, it has also been a contentious issue in public policy debates. The number of individuals seeking legal immigration to the United States has risen throughout history, but immigration trends are subject to a variety of external factors which create inconsistencies over time. Global strife, including natural disasters, war, political instability, and economic downturns can cause periods of intense surges in the number of individuals seeking to immigrate to the United States. Domestically, the attitudes and values of lawmakers and their constituencies can result in more stringent immigration policy and quotas, restricting the flow for certain periods. With a time-series data set covering 200 years of immigration to the United States, it is possible to create a basic forecast of what policy makers can expect for future immigration trends. 
+
+##Data Description: Mining and Cleansing
+
+Immigration data of many types are available directly from the U.S.Department of Homeland Security website data retrieval tool. To begin with as wide a breadth of data as possible, I was able to acquire roughly 20 tables measuring various characteristics regarding individual immigration categories. I decided to begin with the most general data in order to provide a solid foundation from which this topic could be further investigated. The data was clean, but needed to be reoganized into tidy fashion. This was accomplished in STATA. The dataset has two columns: "Year", with a range beginning in 1820 and ending in 2017, moving sequentially at 1 year intervals, and the corresponding number of individuals obtaining legal permanent residence status for each year in the time-dimension (n = 197)
+
+```{r eval= TRUE, echo = FALSE}
+library(fpp2)
+library(tseries)
+library(urca)
+immig_allyears <- read.csv("~/Desktop/immig_allyears.csv")
+immig <- immig_allyears
+immig <- immig[, -1]
+immig <- ts(immig)
+
+autoplot(immig)
+ggAcf(immig)
+gglagplot(immig)
+
+im_all_naive <- naive(immig)
+autoplot(im_all_naive)
+checkresiduals(im_all_naive)
+```
+
+# Statistical Methods: Exploratory Analysis
+
+After producing a time-series plot, an ACF lag plot, and an initial naive forecast, there are several issues to consider. The series is measured by consectuive one-year periods and does not have seasonality. It appears to have some cyclicality and upward trend, and the ACF plot makes clear that this is not a white-noise series, with significant autocorrelation up to and beyond 20 lags. Checking the residuals from the naive forecast, that they are normally, clearly autocorrelated and not white-noise. It appears that the series needs to be divided and tested in order to assess the accuracy of various forecasting  methods. For the next step, I will split the series into a training and test set to compare the accuracy of various forecasting models.
+
+
+
+
+```{r echo = FALSE}
+im1 <- window(immig, end = 150)
+im_train <- ts(im1)
+autoplot(im_train)
+ggAcf(im_train)
+
+im2 <- window(immig, start = 151)
+im_test <- ts(im2, start = 151)
+autoplot(im_test)
+ggAcf(im_test)
+im_train %>%
+  Box.test(lag = , fitdf = 0, type = "Lj")
+im_test %>%
+  Box.test(lag = , fitdf = 0, type = "Lj")
+
+```
+
+
+The data are split into a training and test set. The ACF plots for each show that neither series by itself is white-noise, with the first 19 lags for training set showing significant autocorrelation, and the first five lags of the test set. 
+
+## Results: Basic Forecasts
+
+By comparing the accuracy of a mean forecast, naive forecast, and random walk forecast with drift, the results indicated that the RWF with Drift is the best model here, as the errors are minimized compared to the simple naive forecast and mean forecasts. However, the RMSE is still substantial, indicating that further analysis is need to correct the model and create the best possible forecast. The residuals for the mean forecast here are not normally distributed, but they are for the naive and drift. Moving forward, we will discard using the simple mean forecasting approach.
+
+```{r echo = FALSE}
+
+im_avg <- im_train%>%
+  meanf(h = 50)
+autoplot(im_avg)
+checkresiduals(im_avg)
+
+im_naive <- im_train %>%
+  naive(h = 50)
+autoplot(im_naive)
+checkresiduals(im_naive)
+
+im_drift <- im_train %>%
+  rwf(h = 50, drift = TRUE)
+autoplot(im_drift)
+checkresiduals(im_drift)
+
+
+accuracy(im_avg, im_test)
+accuracy(im_naive, im_test)
+accuracy(im_drift, im_test)
+```
+
+It appears that variation increases with the level of the series. The next step is to see if a Box-Cox transformation will help increase the accuracy of the forecast.
+
+#Statistical Methods: Box-Cox Transformation
+
+```{r echo = FALSE}
+lambda <- BoxCox.lambda(immig)
+immig_trans <- BoxCox(immig, lambda)
+
+
+im1_trans <- window(immig_trans, end = 150)
+im_train_trans <- ts(im1_trans)
+
+
+im2_trans <- window(immig_trans, start = 151)
+im_test_trans <- ts(im2_trans, start = 151)
+
+autoplot(im_train_trans)
+autoplot(im_test_trans)
+
+
+im_naive_trans <- im_train_trans %>%
+  naive(h = 50)
+autoplot(im_naive_trans)
+checkresiduals(im_naive_trans)
+
+im_drift_trans <- im_train_trans %>%
+  rwf(h = 50, drift = TRUE)
+autoplot(im_drift_trans)
+checkresiduals(im_drift_trans)
+
+
+accuracy(im_naive_trans, im_test_trans)
+accuracy(im_drift_trans, im_test_trans)
+```
+
+
+
+This appeared to work nicely. By applying a Box-Cox transformation to the entire dataset and then retrainig and testing the naive and RWF Drift models, the errors were successfully minimized. The better model is the RWF Drift model, with a Mean Error of .0093 and a Random Mean Squared Error of .108. The Ljung-Box test reveals a p-value of < 0.001, meaning the residuals are significantly autocorrelated. Next the model will be applied to the entire dataset
+
+
+##Results: Applying the Model
+
+Applying this best-fit model to the entire dataset yielded minimal errors, a tighter confidence interval, and an overall viable forecasting model. Beyond this, there is one more step we can take to possibly obtain a model of best-fit: auto-arima.
+
+```{r echo = FALSE}
+im_all_drift <- immig_trans%>%
+  rwf(h = 50, drift = TRUE)
+autoplot(im_all_drift)
+checkresiduals(im_all_drift)
+
+summary(im_all_drift)
+
+```
+
+## Statistical Methods: ARIMA--Stationarity
+
+Given that an appropriate Box-Cox transformation has been conducted, and that a best-fit model has been selected from the benchmark methods, the next logical step is to apply and ARIMA model to obtain the ultimate model of best fit. The first stage here is to go back and check for stationarity.
+
+```{r echo = FALSE}
+ggAcf(immig_trans)
+adf.test(immig_trans)
+summary(ur.kpss(immig_trans))
+ndiffs(immig_trans)
+```
+
+
+The model decays slowly, showing that it is nonstationary. While it passes the ADF test, the KPSS test returns a t-statistic of 1.405, meaning we must reject the null hypothesis that the data is stationary. Nonstationarity is established, and the number of differences required to make the series stationary is 1.
+
+##Results: ARIMA -- Differencing
+
+```{r echo = FALSE}
+ndiffs(immig_trans)
+im_diff <- diff(immig_trans)
+acf_diff <- Acf(im_diff)
+adf_diff <- adf.test(im_diff)
+diff_sum <- summary(ur.kpss(im_diff))
+diff_sum
+
+#Reject null that data is non-stationary
+#Fail to reject null that data is stationary
+
+
+```
+
+Now that the serie has been differenced accordingly, the next step is to find the ARIMA model of best-fit. To do this, it is necessary to assess the results of the auto.arima function, then take a closer look at the ACF and PACF plots of the transformed series. If a more suitable order can be ascertained, it will be worth attempting to set the order manually if auto.arima does not return the best fit.
+
+```{r eval = TRUE, echo = FALSE}
+ggAcf(immig_trans)
+ggPacf(immig_trans)
+
+ar1 <- auto.arima(immig_trans, seasonal = FALSE)
+summary(ar1)
+
+ar2 <- auto.arima(immig_trans, seasonal = FALSE, stepwise = FALSE, approximation = FALSE)
+summary(ar2)
+
+ar3 <- Arima(immig_trans, order = c(16,0,0))
+summary(ar3)
+  
+ar1%>%
+  forecast(h = 50)%>%
+  autoplot(include = 200)
+
+ar2%>%
+  forecast(h = 50)%>%
+  autoplot(include = 200)
+
+ar3%>%
+  forecast(h = 50)%>%
+  autoplot(include = 200)
+
+checkresiduals(ar3)
+```
+
+
+
+##Discussion
+
+Statistical approaches for this step were predicated on previous steps; these include isolating the best benchmark method, transforming the data appropriately to account for instability and unequal variance, and apply the best method to the whole dataset. The RWF with Drift was most appropriate for this dataset after using a Box-Cox transformation on the inital data. After transforming the data with the appropriate lambda value, an assessment of stationarity and differencing was conducted. The transformed data was differenced once to obtain stationarity. From there, the ARIMA methodology was applied to determine the most accurate model based on the ACF and PACF plots when compared to the results of the auto.arima function. Upon review, it appears that the manual ARIMA model with order (16, 0, 0) returned the most accurate forecast when compared with both auto.arima models. The log-likelihood estimate returned for this model = 87.86, which is substantial. Mean Error = 0.013, and Root Mean Squared Error = 0.15. This is the most robust statistical model obtained so far due to the rigorousness of the testing approach and the relatively straightforward nature of the data. When approaching the data practically, we can see that the manual ARIMA model, when visualized, seems to match the complex trend present in the data, something confirmed by the log-likelihood estimate. Overall, this model seems to be accurate enough to provide a workable framework from which to drill down on more specific elements regarding immigration trends and policy.  However, it must noted that this model does not account for any other elements other than time and rate. The changing political climate over time results in policy fluxations that impact immigration trends in various ways, which need to be incorporated into futher models to increase accuracy and robustness.
